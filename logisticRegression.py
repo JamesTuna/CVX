@@ -13,7 +13,7 @@ class LogisticRegression(object):
         self.n_class = n_class
         self.regularization = regularization
 
-    def fit(self,X,y,optimizer='GD',iter=1e+4,lr=1e-3,batch=32):
+    def fit(self,X,y,optimizer='GD',iter=1e+4,lr=1e-3,batch=32,log_path='./'):
         print("start training model...")
         assert (X.shape[1]==self.n_feature), 'mismatch: number of features'
         assert (y.max()<=self.n_class-1), 'mismatch: max index of classes'
@@ -37,6 +37,12 @@ class LogisticRegression(object):
         AGD_y_old = self.B
         AGD_y_new = None
 
+        # log data
+        min_loss_test = np.inf
+        min_loss_iter = 0
+        min_loss_acc = 0
+        file_old = None
+
         for i in range(iter):
             if optimizer == 'GD':
                 self.back_prop(batch=batch)
@@ -51,12 +57,10 @@ class LogisticRegression(object):
                 AGD_y_old = AGD_y_new
                 AGD_lambda_old = AGD_lambda_new
 
-                #if i % 50 == 1:
-                    #print("gamma: %.4f lambda: %.4f"%(AGD_gamma,AGD_lambda_new))
-
+            # test and record
             if i % 50 == 1:
-                loss,acc = self.getLoss(self.X,self.y,self.B,self.regularization)
-                test_loss,test_acc = self.getLoss(self.X_test,self.y_test,self.B,self.regularization)
+                loss,acc = self.getLoss(self.X,self.y,self.B,0)
+                test_loss,test_acc = self.getLoss(self.X_test,self.y_test,self.B,0)
                 print('iter: %s on train: loss: %.4f acc: %.4f'%(i,loss,acc))
                 print('iter: %s on test: loss: %.4f acc: %.4f'%(i,test_loss,test_acc))
 
@@ -64,6 +68,17 @@ class LogisticRegression(object):
                 train_loss_list.append(loss)
                 test_acc_list.append(test_acc)
                 train_acc_list.append(acc)
+
+                if test_loss < min_loss_test:
+                    min_loss_test = test_loss
+                    min_loss_iter = i
+                    min_loss_acc = test_acc
+
+                    filename = '-'.join([optimizer,str(self.regularization),str(batch),str(lr),'loss',str(min_loss_test),'acc',str(min_loss_acc)])+'.npy'
+                    if file_old != None:
+                        os.remove(file_old)
+                    np.save(filename,self.B)
+                    file_old = filename
 
         return train_loss_list,train_acc_list,test_loss_list,test_acc_list
 
@@ -101,20 +116,19 @@ class LogisticRegression(object):
         self.G += 2 * self.regularization * self.G
 
     def predict(self,X_test):
-        pass
+        print("not implemented")
 
-    def save_model(self,path):
-        np.save(path,self.B)
+
 
 
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='logistic regression')
-    parser.add_argument('--batch-size', type=int, default=128, help='Number of samples per mini-batch')
+    parser.add_argument('--batch-size', type=int, default=12564, help='Number of samples per mini-batch')
     parser.add_argument('--iter', type=int, default=1e+4, help='Number of iteration to optimize')
     parser.add_argument('--lr', type=float, default=10, help='step size')
     parser.add_argument('--MU', type=float, default=0, help='regularization coefficient')
-    parser.add_argument('--optimizer', type=str, default=0, help='regularization coefficient')
+    parser.add_argument('--optimizer', type=str, default=0, help='GD or AGD')
     args = parser.parse_args()
 
     BATCH_SIZE = int(args.batch_size)
@@ -128,7 +142,7 @@ if __name__ == '__main__':
     X_test = np.array(pd.read_csv('data/logistic_news/X_test.csv',header=None))
     y_test = np.array(pd.read_csv('data/logistic_news/y_test.csv',header=None))[0]
     # run SGD
-    model = LogisticRegression(n_feature=X.shape[1],n_class=20,regularization = 0)
+    model = LogisticRegression(n_feature=X.shape[1],n_class=20,regularization = MU)
     model.X_test = X_test
     model.y_test = y_test
     train_loss,train_acc,test_loss,test_acc = model.fit(X,y,optimizer=args.optimizer,iter=ITER,lr=LR,batch=BATCH_SIZE)
@@ -144,5 +158,3 @@ if __name__ == '__main__':
 
     plt.savefig('-'.join([args.optimizer,str(MU),str(BATCH_SIZE),str(ITER)])+'.pdf')
     plt.show()
-
-    model.save_model('-'.join(['GD',str(MU),str(BATCH_SIZE),str(ITER)])+'.npy')
