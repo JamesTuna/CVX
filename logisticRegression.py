@@ -30,10 +30,30 @@ class LogisticRegression(object):
         test_acc_list = []
         train_acc_list = []
 
+        # parameters for nesterov
+        AGD_lambda_old = 0
+        AGD_lambda_new = None
+        AGD_gamma = None
+        AGD_y_old = self.B
+        AGD_y_new = None
+
         for i in range(iter):
             if optimizer == 'GD':
-                self.back_prop(lr,batch=batch)
+                self.back_prop(batch=batch)
                 self.B += lr * (-self.G)
+            elif optimizer == 'AGD':
+                self.back_prop(batch=batch)
+                AGD_y_new = self.B - lr * self.G
+                AGD_lambda_new = (1+np.sqrt(1+4*AGD_lambda_old**2))/2
+                AGD_gamma = (1-AGD_lambda_old)/AGD_lambda_new
+                self.B = (1-AGD_gamma) * AGD_y_new + AGD_gamma * AGD_y_old
+
+                AGD_y_old = AGD_y_new
+                AGD_lambda_old = AGD_lambda_new
+
+                #if i % 50 == 1:
+                    #print("gamma: %.4f lambda: %.4f"%(AGD_gamma,AGD_lambda_new))
+
             if i % 50 == 1:
                 loss,acc = self.getLoss(self.X,self.y,self.B,self.regularization)
                 test_loss,test_acc = self.getLoss(self.X_test,self.y_test,self.B,self.regularization)
@@ -67,7 +87,7 @@ class LogisticRegression(object):
         accuracy = (predict == y[:N]).sum()/N
         return loss,accuracy
 
-    def back_prop(self,lr,batch=32):
+    def back_prop(self,batch=32):
         batch_samples = np.random.choice(self.N,batch,replace=False)
         # compute gradient
         Xs = self.X[batch_samples]
@@ -94,6 +114,7 @@ if __name__ == '__main__':
     parser.add_argument('--iter', type=int, default=1e+4, help='Number of iteration to optimize')
     parser.add_argument('--lr', type=float, default=10, help='step size')
     parser.add_argument('--MU', type=float, default=0, help='regularization coefficient')
+    parser.add_argument('--optimizer', type=str, default=0, help='regularization coefficient')
     args = parser.parse_args()
 
     BATCH_SIZE = int(args.batch_size)
@@ -110,7 +131,7 @@ if __name__ == '__main__':
     model = LogisticRegression(n_feature=X.shape[1],n_class=20,regularization = 0)
     model.X_test = X_test
     model.y_test = y_test
-    train_loss,train_acc,test_loss,test_acc = model.fit(X,y,optimizer='GD',iter=ITER,lr=LR,batch=BATCH_SIZE)
+    train_loss,train_acc,test_loss,test_acc = model.fit(X,y,optimizer=args.optimizer,iter=ITER,lr=LR,batch=BATCH_SIZE)
     # draw plots
     fig,axs = plt.subplots(1,2)
     axs[0].plot(train_loss,'blue')
@@ -121,7 +142,7 @@ if __name__ == '__main__':
     axs[1].plot(test_acc,'red')
     axs[1].set_title('accuracy')
 
-    plt.savefig('-'.join(['GD',str(MU),str(BATCH_SIZE),str(ITER)])+'.pdf')
+    plt.savefig('-'.join([args.optimizer,str(MU),str(BATCH_SIZE),str(ITER)])+'.pdf')
     plt.show()
 
     model.save_model('-'.join(['GD',str(MU),str(BATCH_SIZE),str(ITER)])+'.npy')
