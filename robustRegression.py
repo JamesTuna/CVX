@@ -14,7 +14,7 @@ class RobustRegression(object):
         train_loss_list = []
         assert X.shape[0] == y.shape[0], 'mismatch number of samples and labels'
         self.N, self.n_feature = X.shape
-        self.B = np.random.normal(0,1,self.n_feature)
+        self.B = np.random.uniform(0,1,self.n_feature)
         self.X = X
         self.y = y
         for i in range(iter):
@@ -26,38 +26,30 @@ class RobustRegression(object):
                 loss = self.getLoss()
                 print('iter: %s, loss: %s'%(i,loss))
                 train_loss_list.append(loss)
+        print(self.B,self.B.sum())
         return train_loss_list
 
     def fit_MD(self,X,y,iter=1000,lr=0.1):
         train_loss_list = []
         assert X.shape[0] == y.shape[0], 'mismatch number of samples and labels'
         self.N, self.n_feature = X.shape
-        self.B = np.random.normal(0,1,self.n_feature)
+        self.B = np.random.uniform(0,1,self.n_feature)
         self.X = X
         self.y = y
         for i in range(iter):
             self.back_prop()
             # Mirror Descent step
-            # by solving min lr < gt,x > + D(x,xt)
-            # optimal point is xt/exp(lr gt)
+            # by solving min lr < gt,x > + D(x,xt) overl simplex
+            # optimal point is normalized version of xt/exp(lr gt)
             self.B = self.B / np.exp(lr * self.G)
-            self.B = self.projsplx(self.B)
-
+            self.B = np.abs(self.B) / np.linalg.norm(self.B,1)
             if i % 10 == 1:
                 loss = self.getLoss()
                 print('iter: %s, loss: %s'%(i,loss))
                 #print(self.B)
                 train_loss_list.append(loss)
+        print(self.B,self.B.sum())
         return train_loss_list
-
-    def getLoss(self):
-        return np.linalg.norm(self.X.dot(self.B)-self.y)
-
-    def back_prop(self):
-        predict = self.X.dot(self.B) - self.y
-        predict[predict>0] = 1
-        predict[predict<0] = -1
-        self.G = self.X.T.dot(predict)
 
     def projsplx(self,y):
         """projsplx projects a vector to a simplex
@@ -84,6 +76,15 @@ class RobustRegression(object):
         assert np.abs(x.sum() - 1.) <= 1e-5
         assert np.all(x >= 0) and np.all(x <= 1.)
         return x
+
+    def getLoss(self):
+        return np.linalg.norm(self.X.dot(self.B)-self.y)
+
+    def back_prop(self):
+        predict = self.X.dot(self.B) - self.y
+        predict[predict>0] = 1
+        predict[predict<0] = -1
+        self.G = self.X.T.dot(predict)
 
 if __name__ == '__main__':
     ITER = 2000
