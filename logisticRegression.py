@@ -13,7 +13,7 @@ class LogisticRegression(object):
         self.n_class = n_class
         self.regularization = regularization
 
-    def fit(self,X,y,optimizer='GD',iter=1e+4,lr=1e-3,batch=32,log_path='./'):
+    def fit(self,X,y,optimizer='GD',iter=1e+4,lr=1e-3,batch=32,log_path='./',log_interval=2000):
         print("start training model...")
         assert (X.shape[1]==self.n_feature), 'mismatch: number of features'
         assert (y.max()<=self.n_class-1), 'mismatch: max index of classes'
@@ -58,11 +58,11 @@ class LogisticRegression(object):
                 AGD_lambda_old = AGD_lambda_new
 
             # test and record
-            if i % 50 == 1:
+            if i % log_interval == 0:
                 loss,acc = self.getLoss(self.X,self.y,self.B,0)
                 test_loss,test_acc = self.getLoss(self.X_test,self.y_test,self.B,0)
-                print('iter: %s on train: loss: %.4f acc: %.4f'%(i,loss,acc))
-                print('iter: %s on test: loss: %.4f acc: %.4f'%(i,test_loss,test_acc))
+                print('iter: %s train: loss: %.4f test_loss: %.4f'%(i,loss,test_loss))
+                #print('iter: %s on test: loss: %.4f acc: %.4f'%(i,test_loss,test_acc))
 
                 test_loss_list.append(test_loss)
                 train_loss_list.append(loss)
@@ -74,11 +74,13 @@ class LogisticRegression(object):
                     min_loss_iter = i
                     min_loss_acc = test_acc
 
+                    '''
                     filename = '-'.join([optimizer,str(self.regularization),str(batch),str(lr),'loss',str(min_loss_test),'acc',str(min_loss_acc)])+'.npy'
                     if file_old != None:
                         os.remove(file_old)
                     np.save(filename,self.B)
                     file_old = filename
+                    '''
 
         return train_loss_list,train_acc_list,test_loss_list,test_acc_list
 
@@ -129,12 +131,14 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=10, help='step size')
     parser.add_argument('--MU', type=float, default=0, help='regularization coefficient')
     parser.add_argument('--optimizer', type=str, default=0, help='GD or AGD')
+    parser.add_argument('--interval', type=int, default=0, help='log interval')
     args = parser.parse_args()
 
     BATCH_SIZE = int(args.batch_size)
     LR = float(args.lr)
     MU = float(args.MU)
     ITER = int(args.iter)
+    INTERVAL = int(args.interval)
 
     # read data
     X = np.array(pd.read_csv('data/logistic_news/X_train.csv',header=None))
@@ -145,16 +149,28 @@ if __name__ == '__main__':
     model = LogisticRegression(n_feature=X.shape[1],n_class=20,regularization = MU)
     model.X_test = X_test
     model.y_test = y_test
-    train_loss,train_acc,test_loss,test_acc = model.fit(X,y,optimizer=args.optimizer,iter=ITER,lr=LR,batch=BATCH_SIZE)
+    train_loss,train_acc,test_loss,test_acc = model.fit(X,y,optimizer=args.optimizer,iter=ITER,lr=LR,batch=BATCH_SIZE,log_interval=INTERVAL)
+
     # draw plots
-    fig,axs = plt.subplots(1,2)
-    axs[0].plot(train_loss,'blue')
-    axs[0].plot(test_loss,'red')
+    print('train loss %.4f test loss %.4f'%(train_loss[-1],test_loss[-1]))
+    iterations = np.array([i for i in range(0,ITER*2,INTERVAL)])
+    iterations = iterations[:len(train_acc)]
+    fig,axs = plt.subplots(1,2,figsize=(16,8))
+    l1, = axs[0].plot(iterations,train_loss,'blue')
+    l3, = axs[0].plot(iterations,test_loss,'red')
+    iterations = iterations[:len(train_acc)]
     axs[0].set_title('loss')
+    axs[0].set_xlabel('iteration')
+    axs[0].set_ylabel('loss')
 
-    axs[1].plot(train_acc,'blue')
-    axs[1].plot(test_acc,'red')
+
+    l2, = axs[1].plot(iterations,train_acc,'blue')
+    l4, = axs[1].plot(iterations,test_acc,'red')
     axs[1].set_title('accuracy')
+    axs[1].set_xlabel('iteration')
+    axs[1].set_ylabel('accuracy')
 
+    axs[0].legend([l1,l3],['train','test'],loc='best')
+    axs[1].legend([l2,l4],['train','test'],loc='best')
     plt.savefig('-'.join([args.optimizer,str(MU),str(BATCH_SIZE),str(ITER)])+'.pdf')
     plt.show()
