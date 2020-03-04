@@ -61,7 +61,7 @@ class LogisticRegression(object):
             if i % log_interval == 0:
                 loss,acc = self.getLoss(self.X,self.y,self.B,0)
                 test_loss,test_acc = self.getLoss(self.X_test,self.y_test,self.B,0)
-                print('iter: %s train: loss: %.4f test_loss: %.4f'%(i,loss,test_loss))
+                print('MU: %s iter: %s train: loss: %.4f test_loss: %.4f'%(self.regularization,i,loss,test_loss))
                 #print('iter: %s on test: loss: %.4f acc: %.4f'%(i,test_loss,test_acc))
 
                 test_loss_list.append(test_loss)
